@@ -1,0 +1,183 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Cấu hình
+local CorrectKey = "CHII_HAUU_2026" 
+local HasKey = false
+_G.AutoFarmChest = false
+
+local Window = Rayfield:CreateWindow({
+   Name = "🏴‍☠️ Blox Fruits: Chii Hauu HUB",
+   LoadingTitle = "Hệ Thống Dịch Chuyển Tức Thời",
+   LoadingSubtitle = "by Chii Hauu",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false, 
+   Keybind = "LeftControl", 
+   Image = 1000021974 -- Avatar hình tròn
+})
+
+-- Hàm chèn nền ảnh
+local function AddBackground()
+    pcall(function()
+        local MainFrame = game:GetService("CoreGui").Rayfield.Main
+        if not MainFrame:FindFirstChild("ChiiHauuBackground") then
+            local BG = Instance.new("ImageLabel")
+            BG.Name = "ChiiHauuBackground"
+            BG.Parent = MainFrame
+            BG.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            BG.BackgroundTransparency = 1.000
+            BG.Size = UDim2.new(1, 0, 1, 0)
+            BG.Image = "rbxassetid://1000021853" 
+            BG.ImageTransparency = 0.5 
+            BG.ZIndex = 0 
+            local UICorner = Instance.new("UICorner")
+            UICorner.CornerRadius = UDim.new(0, 10)
+            UICorner.Parent = BG
+        end
+    end)
+end
+task.spawn(AddBackground)
+
+-- 1. Hàm Đổi Server
+function ServerHop()
+    local HttpService = game:GetService("HttpService")
+    local TeleportService = game:GetService("TeleportService")
+    pcall(function()
+        local Servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        for i, v in pairs(Servers.data) do
+            if v.playing < v.maxPlayers and v.id ~= game.JobId then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, v.id)
+                break
+            end
+        end
+    end)
+end
+
+-- 2. Hàm kiểm tra đồ quý
+function checkRareItems()
+    local rareItems = {"God's Chalice", "Fist of Darkness"}
+    for _, itemName in pairs(rareItems) do
+        if game.Players.LocalPlayer.Backpack:FindFirstChild(itemName) or 
+           (game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild(itemName)) then
+            _G.AutoFarmChest = false 
+            return true
+        end
+    end
+    return false
+end
+
+-- 3. Noclip & Fix trọng lực (Chống rơi khi TP)
+task.spawn(function()
+    game:GetService("RunService").Stepped:Connect(function()
+        pcall(function()
+            if _G.AutoFarmChest and game.Players.LocalPlayer.Character then
+                local Root = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                for _, v in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                    if v:IsA("BasePart") then v.CanCollide = false end
+                end
+                if Root and not Root:FindFirstChild("ChiiHauuVel") then
+                    local bv = Instance.new("BodyVelocity")
+                    bv.Name = "ChiiHauuVel"
+                    bv.Velocity = Vector3.new(0,0,0)
+                    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                    bv.Parent = Root
+                end
+            else
+                if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character.HumanoidRootPart:FindFirstChild("ChiiHauuVel") then
+                    game.Players.LocalPlayer.Character.HumanoidRootPart.ChiiHauuVel:Destroy()
+                end
+            end
+        end)
+    end)
+end)
+
+-- LOGIC DỊCH CHUYỂN TỨC THỜI (INSTANT TP)
+function doFarmChest()
+    task.spawn(function()
+        while _G.AutoFarmChest do
+            task.wait() -- Tốc độ quét rương cực nhanh
+            
+            if checkRareItems() then 
+                Rayfield:Notify({Title = "⚠️ DỪNG LẠI!", Content = "Đã nhặt được đồ quý!", Duration = 10})
+                break 
+            end
+
+            local targetChest = nil
+            local minDist = math.huge
+
+            -- Tìm rương gần nhất
+            for _, v in pairs(game:GetService("Workspace"):GetDescendants()) do
+                if v:IsA("TouchTransmitter") and v.Parent and v.Parent.Name:find("Chest") then
+                    local chest = v.Parent
+                    local Root = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if Root and chest:IsA("BasePart") then
+                        local dist = (chest.Position - Root.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            targetChest = chest
+                        end
+                    end
+                end
+            end
+
+            if targetChest and _G.AutoFarmChest then
+                local Root = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if Root then
+                    -- DỊCH CHUYỂN TỨC THỜI ĐẾN RƯƠNG
+                    Root.CFrame = targetChest.CFrame
+                    
+                    -- Đợi rương biến mất rồi mới tìm rương khác (tránh bị kẹt 1 chỗ)
+                    local timeout = 0
+                    while targetChest.Parent and _G.AutoFarmChest do
+                        task.wait()
+                        timeout = timeout + 1
+                        if timeout > 100 or checkRareItems() then break end
+                    end
+                end
+            else
+                -- Khi không còn rương nào trong Server
+                if _G.AutoFarmChest then
+                    Rayfield:Notify({Title = "Chii Hauu", Content = "Hết rương! Đang nhảy Server...", Duration = 3})
+                    task.wait(0.5)
+                    ServerHop()
+                    break
+                end
+            end
+        end
+    end)
+end
+
+-- TABS
+local KeyTab = Window:CreateTab("🔑 Hệ Thống Key", 4483362458)
+local MainTab = Window:CreateTab("💰 Auto Farm", 4483362458)
+
+KeyTab:CreateInput({
+   Name = "Nhập Key",
+   PlaceholderText = "Key: " .. CorrectKey,
+   Callback = function(Text)
+      if Text == CorrectKey then
+         HasKey = true
+         Rayfield:Notify({Title = "THÀNH CÔNG", Content = "Chào mừng Chii Hauu!", Duration = 5})
+      end
+   end,
+})
+
+MainTab:CreateToggle({
+   Name = "Bật Auto Farm Chest (Instant TP)",
+   CurrentValue = false,
+   Callback = function(Value)
+      if HasKey then
+         _G.AutoFarmChest = Value
+         if Value then doFarmChest() end
+      else
+         Rayfield:Notify({Title = "LỖI", Content = "Vui lòng nhập Key trước!", Duration = 5})
+      end
+   end,
+})
+
+MainTab:CreateButton({
+   Name = "🛑 Dừng Toàn Bộ Script",
+   Callback = function()
+      _G.AutoFarmChest = false
+      Rayfield:Destroy()
+   end,
+})
